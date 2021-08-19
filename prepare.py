@@ -19,57 +19,64 @@ def prep_iris(df):
     df = pd.concat([df, dummy_df], axis=1)
     return df
 
-def impute_mode(train, validate, test):
+def prep_titanic(df):
     '''
-    impute mode for embark_town
+    This function take in the titanic data acquired by get_titanic_data,
+    Returns prepped train, validate, and test dfs with embarked dummy vars,
+    deck dropped, and the mean of age imputed for Null values.
     '''
-    imputer = SimpleImputer(strategy='most_frequent', missing_values=None)
-    train[['embark_town']] = imputer.fit_transform(train[['embark_town']])
-    validate[['embark_town']] = imputer.transform(validate[['embark_town']])
-    test[['embark_town']] = imputer.transform(test[['embark_town']])
+    
+    # drop rows where embarked/embark town are null values
+    df = df[~df.embarked.isnull()]
+    
+    # encode embarked using dummy columns
+    titanic_dummies = pd.get_dummies(df.embarked, drop_first=True)
+    
+    # join dummy columns back to df
+    df = pd.concat([df, titanic_dummies], axis=1)
+    
+    # drop the deck column
+    df = df.drop(columns='deck')
+    
+    # split data into train, validate, test dfs
+    train, validate, test = titanic_split(df)
+    
+    # impute mean of age into null values in age column
+    train, validate, test = impute_mean_age(train, validate, test)
+    
     return train, validate, test
 
-def prep_titanic_data(df):
+def titanic_split(df):
     '''
-    takes in a dataframe of the titanic dataset as it is acquired and returns a cleaned dataframe
-    arguments: df: a pandas DataFrame with the expected feature names and columns
-    return: train, test, split: three dataframes with the cleaning operations performed on them
+    This function take in the titanic data acquired by get_titanic_data,
+    performs a split and stratifies survived column.
+    Returns train, validate, and test dfs.
     '''
-    df = df.drop_duplicates()
-    df = df.drop(columns=['deck', 'embarked', 'class', 'age', 'passenger_id'])
-    train, test = train_test_split(df, test_size=0.2, random_state=1349, stratify=df.survived)
-    train, validate = train_test_split(train, train_size=0.7, random_state=1349, stratify=train.survived)
-    train, validate, test = impute_mode(train, validate, test)
-    dummy_train = pd.get_dummies(train[['sex', 'embark_town']], drop_first=[True,True])
-    dummy_validate = pd.get_dummies(validate[['sex', 'embark_town']], drop_first=[True,True])
-    dummy_test = pd.get_dummies(test[['sex', 'embark_town']], drop_first=[True,True])
-    train = pd.concat([train, dummy_train], axis=1)
-    validate = pd.concat([validate, dummy_validate], axis=1)
-    test = pd.concat([test, dummy_test], axis=1)
-    train = train.drop(columns=['sex', 'embark_town'])
-    validate = validate.drop(columns=['sex', 'embark_town'])
-    test = test.drop(columns=['sex', 'embark_town'])
+    train_validate, test = train_test_split(df, test_size=.2, 
+                                        random_state=123, 
+                                        stratify=df.survived)
+    train, validate = train_test_split(train_validate, test_size=.3, 
+                                   random_state=123, 
+                                   stratify=train_validate.survived)
     return train, validate, test
 
-def prep_titanic_data_for_logit(df):
+
+def impute_mean_age(train, validate, test):
     '''
-    takes in a dataframe of the titanic dataset as it is acquired and returns a cleaned dataframe
-    arguments: df: a pandas DataFrame with the expected feature names and columns
-    return: train, test, split: three dataframes with the cleaning operations performed on them
+    This function imputes the mean of the age column for
+    observations with missing values.
+    Returns transformed train, validate, and test df.
     '''
-    df = df.drop_duplicates()
-    df = df.drop(columns=['deck', 'embarked', 'class', 'passenger_id'])
-    df.age = df.age.fillna(value=df.age.mean())
-    train, test = train_test_split(df, test_size=0.2, random_state=1349, stratify=df.survived)
-    train, validate = train_test_split(train, train_size=0.7, random_state=1349, stratify=train.survived)
-    train, validate, test = impute_mode(train, validate, test)
-    dummy_train = pd.get_dummies(train[['sex', 'embark_town']], drop_first=[True,True])
-    dummy_validate = pd.get_dummies(validate[['sex', 'embark_town']], drop_first=[True,True])
-    dummy_test = pd.get_dummies(test[['sex', 'embark_town']], drop_first=[True,True])
-    train = pd.concat([train, dummy_train], axis=1)
-    validate = pd.concat([validate, dummy_validate], axis=1)
-    test = pd.concat([test, dummy_test], axis=1)
-    train = train.drop(columns=['sex', 'embark_town'])
-    validate = validate.drop(columns=['sex', 'embark_town'])
-    test = test.drop(columns=['sex', 'embark_town'])
+    # create the imputer object with mean strategy
+    imputer = SimpleImputer(strategy = 'mean')
+    
+    # fit on and transform age column in train
+    train['age'] = imputer.fit_transform(train[['age']])
+    
+    # transform age column in validate
+    validate['age'] = imputer.transform(validate[['age']])
+    
+    # transform age column in test
+    test['age'] = imputer.transform(test[['age']])
+    
     return train, validate, test
